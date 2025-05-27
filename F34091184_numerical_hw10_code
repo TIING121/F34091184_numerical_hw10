@@ -1,0 +1,118 @@
+import numpy as np
+
+print("\n(a) Newton's method solution:")
+def F(X):
+    x1, x2, x3 = X
+    return np.array([
+        10*x1 + 2*x2**2 - 3*x3 - 9,
+        x1**2 + 3*x2 - x3**2 + 2,
+        x1*x2*x3 - 6
+    ])
+
+def J(X):
+    x1, x2, x3 = X
+    return np.array([
+        [10,       4*x2,   -3],
+        [2*x1,     3,     -2*x3],
+        [x2*x3,    x1*x3,  x1*x2]
+    ])
+
+def newton_method(X0, tol=1e-10, max_iter=100):
+    X = X0.copy()
+    for i in range(max_iter):
+        Fx = F(X)
+        Jx = J(X)
+        delta = np.linalg.solve(Jx, -Fx)
+        X = X + delta
+        if np.linalg.norm(delta) < tol:
+            break
+    return X
+
+X0 = np.array([1.0, 1.0, 1.0])
+sol_newton = newton_method(X0)
+print("    [x1 x2 x3]= ",np.round(sol_newton, 5))
+print("    Residual=   ",F(sol_newton))
+
+
+print("\n(b) Broyden's method solution:")
+def broyden_method(X0, tol=1e-10, max_iter=100):
+    n = len(X0)
+    X = X0.copy()
+    A = J(X0) 
+    for i in range(max_iter):
+        Fx = F(X)
+        delta = np.linalg.solve(A, -Fx)
+        X_new = X + delta
+        y = F(X_new) - Fx
+        s = delta.reshape((n, 1))
+        y = y.reshape((n, 1))
+        if np.linalg.norm(delta) < tol:
+            break
+        A = A + ((y - A @ s) @ s.T) / (s.T @ s)
+        X = X_new
+    return X
+
+sol_broyden = broyden_method(X0)
+print("    [x1 x2 x3]= ",np.round(sol_broyden, 5))
+print("    Residual=   ",F(sol_broyden))
+
+print("\n(c) Steepest Descent solution:")
+def grad_g(X):
+    eps = 1e-6
+    grad = np.zeros_like(X)
+    g0 = np.sum(F(X)**2)
+    for i in range(len(X)):
+        X1 = X.copy()
+        X1[i] += eps
+        g1 = np.sum(F(X1)**2)
+        grad[i] = (g1 - g0) / eps
+    return grad
+
+def steepest_descent(X0, tol=1e-8, max_iter=5000):
+    X = X0.copy()
+    for i in range(max_iter):
+        grad = grad_g(X)
+        if np.linalg.norm(grad) < tol:
+            break
+        alpha = 1e-3
+        X = X - alpha * grad
+    return X
+
+sol_sd = steepest_descent(X0)
+print("    [x1 x2 x3]= ",np.round(sol_sd, 5))
+print("    Residual=   ",F(sol_sd))
+
+print("\n(d) Continuation method (N=4) solution:")
+def G(X, lam, X0):
+    return lam * F(X) + (1 - lam) * F(X0)
+
+def JG(X, lam):
+    return lam * J(X)
+
+def continuation_method(X0, N=20):
+    h = 1.0 / N
+    X = X0.copy()
+    X_init = X0.copy()
+    lam = 0.0
+    for _ in range(N):
+        F_x0 = F(X_init)
+        def dxdlambda(X_, lam_):
+            JGx = lam_ * J(X_)
+            dGdlambda = F(X_) - F_x0
+            try:
+                v = -np.linalg.solve(JGx, dGdlambda)
+            except np.linalg.LinAlgError:
+                v = np.zeros_like(X_)
+            return v
+
+        k1 = dxdlambda(X, lam)
+        k2 = dxdlambda(X + 0.5*h*k1, lam + 0.5*h)
+        k3 = dxdlambda(X + 0.5*h*k2, lam + 0.5*h)
+        k4 = dxdlambda(X + h*k3, lam + h)
+        X = X + (h/6)*(k1 + 2*k2 + 2*k3 + k4)
+        lam += h
+    return X
+
+sol_cont = continuation_method(X0)
+print("    [x1 x2 x3]= ",np.round(sol_cont, 5))
+print("    Residual=   ",F(sol_cont))
